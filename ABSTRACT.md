@@ -1,4 +1,4 @@
-## Evaluating and Training Small Language Models for Structured Mongo Query Generation
+## Evaluating and Training Small Language Models for Structured MongoDB Query Generation
 
 Large language models can generate MongoDB queries from natural language, but they often hallucinate fields, misuse operators, and depend on costly external APIs. In this talk, we present an end-to-end pipeline for training and evaluating small, self-hosted language models to reliably generate structured MongoDB find and aggregate queries.
 
