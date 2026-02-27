@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "text-to-mongo"
+version = "0.1.0"
+description = "LoRA fine-tuning pipeline for natural language to MongoDB query generation"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+train = [
+    "torch>=2.2.0",
+    "transformers>=4.40.0",
+    "peft>=0.10.0",
+    "trl>=0.8.0",
+    "bitsandbytes>=0.43.0",
+    "datasets>=2.18.0",
+    "accelerate>=0.28.0",
+    "scipy",
+]
+serve = [
+    "fastapi[standard]>=0.100",
+]
+
+[project.scripts]
+text-to-mongo-train = "text_to_mongo.training.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

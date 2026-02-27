@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Training runs (large model weights + logs)
+runs/
+
+# Generated data is committed (see data/)
+
+# Inference service logs
+serve.log
+nohup.out
+experiment_log.txt
+
+# Claude Code
+.claude/
