@@ -247,16 +247,10 @@ Both tools are generic and config-driven — provide a JSON file with your schem
 | Loss | Completion-only (prompt tokens masked) |
 | VRAM usage | ~5 GB (4-bit model + LoRA) |
 
-## Key Design Decisions
+## Limitations
 
-**PeftModel inference (no merge)**: LoRA adapters cannot be merged into 4-bit quantized weights — `merge_and_unload()` silently produces garbage. The adapter is kept as a PeftModel wrapper at runtime.
-
-**Prompt-completion format**: Uses trl's prompt-completion dataset format (separate `prompt` and `completion` columns) which automatically masks prompt tokens from the loss. No custom data collator needed.
-
-**Field semantic roles**: Each field has a role (`identifier`, `measure`, `timestamp`, `category`, `text`, `enum`, `boolean`) that helps the model understand how to use it in queries.
-
-**Short schema descriptions**: The model is sensitive to prompt length. Field descriptions should be 2-5 words — longer descriptions cause degraded output quality.
-
-## License
-
-MIT
+- **Single-collection queries only** — the model generates `find` or `aggregate` against one collection. Cross-collection queries (e.g. `$lookup` joins) are not supported.
+- **Single-stage grouping** — aggregate-of-aggregate patterns like "average number of X per Y" (which require chaining two `$group` stages) are not in the training data. The model handles single `$group` well but gets confused by multi-step aggregations.
+- **No writes** — only generates read queries (`find`, `aggregate`). No `update`, `delete`, or `insert`.
+- **Short field descriptions** — the model is sensitive to prompt length. Field descriptions should be 2-5 words; longer descriptions degrade output quality.
+- **No adapter merging** — the LoRA adapter cannot be merged into 4-bit quantized weights (`merge_and_unload()` silently produces garbage). Must be used as a PeftModel wrapper at runtime.
