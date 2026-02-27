@@ -1,0 +1,122 @@
+{
+  "mongo_db": "dashboard",
+  "schemas": {
+    "products": {
+      "collection": "products",
+      "domain": "cicd_dashboard",
+      "fields": [
+        {"name": "key", "type": "string", "role": "enum", "description": "Product key",
+         "enum_values": ["rhel-ai", "rhaiis", "base-images", "builder-images"]},
+        {"name": "product_name", "type": "string", "role": "text", "description": "Full product name"},
+        {"name": "short_name", "type": "string", "role": "text", "description": "Short product name"},
+        {"name": "supported_versions", "type": "array", "role": "category", "description": "Supported versions"},
+        {"name": "konflux_namespace", "type": "string", "role": "category", "description": "Build namespace"},
+        {"name": "drop_strategy", "type": "string", "role": "enum", "description": "How drops collected",
+         "enum_values": ["gitlab-tags", "artifact-commits"]},
+        {"name": "last_updated", "type": "date", "role": "timestamp", "description": "Last updated date"}
+      ]
+    },
+    "drops": {
+      "collection": "drops",
+      "domain": "cicd_dashboard",
+      "fields": [
+        {"name": "key", "type": "string", "role": "identifier", "description": "Drop key"},
+        {"name": "name", "type": "string", "role": "text", "description": "Drop version name"},
+        {"name": "product_key", "type": "string", "role": "enum", "description": "Product key",
+         "enum_values": ["rhel-ai", "rhaiis", "base-images", "builder-images"]},
+        {"name": "product_version", "type": "string", "role": "text", "description": "Semantic version"},
+        {"name": "created_at", "type": "date", "role": "timestamp", "description": "Drop creation date"},
+        {"name": "announced_at", "type": "date", "role": "timestamp", "description": "Date announced"},
+        {"name": "published_at", "type": "date", "role": "timestamp", "description": "Date published"}
+      ]
+    },
+    "artifacts": {
+      "collection": "artifacts",
+      "domain": "cicd_dashboard",
+      "fields": [
+        {"name": "key", "type": "string", "role": "identifier", "description": "Artifact ID"},
+        {"name": "type", "type": "string", "role": "enum", "description": "Artifact type",
+         "enum_values": ["containers", "disk-images", "cloud-disk-images",
+                         "disk-image-containers", "cloud-containers",
+                         "base-images", "wheels-collections", "instructlab",
+                         "models", "model-cars"]},
+        {"name": "product_key", "type": "string", "role": "enum", "description": "Product key",
+         "enum_values": ["rhel-ai", "rhaiis", "base-images", "builder-images"]},
+        {"name": "variant", "type": "string", "role": "category", "description": "Accelerator and OS"},
+        {"name": "archs", "type": "array", "role": "category", "description": "CPU architecture",
+         "enum_values": ["x86_64", "aarch64", "s390x", "ppc64le"]},
+        {"name": "commit", "type": "string", "role": "identifier", "description": "Git commit SHA"},
+        {"name": "created_at", "type": "date", "role": "timestamp", "description": "Build date"},
+        {"name": "environments", "type": "array", "role": "enum", "description": "Released to stage/prod",
+         "enum_values": ["stage", "production"]},
+        {"name": "drop_keys", "type": "array", "role": "identifier", "description": "Associated drop keys"},
+        {"name": "sha_digest", "type": "string", "role": "identifier", "description": "Image digest"},
+        {"name": "series", "type": "string", "role": "category", "description": "Release series"},
+        {"name": "alternative_names", "type": "array", "role": "text", "description": "Alt registry names"}
+      ]
+    },
+    "git_repositories": {
+      "collection": "git_repositories",
+      "domain": "cicd_dashboard",
+      "fields": [
+        {"name": "key", "type": "string", "role": "identifier", "description": "Repository key"},
+        {"name": "url", "type": "string", "role": "text", "description": "Git URL"},
+        {"name": "type", "type": "string", "role": "enum", "description": "Repository type",
+         "enum_values": ["containers", "disk-images", "wheels-collections",
+                         "cloud-disk-images", "base-images", "instructlab",
+                         "models", "model-cars"]},
+        {"name": "product_keys", "type": "array", "role": "enum", "description": "Product keys",
+         "enum_values": ["rhel-ai", "rhaiis", "base-images", "builder-images"]},
+        {"name": "gitlab_project_id", "type": "int", "role": "identifier", "description": "GitLab project ID"}
+      ]
+    }
+  },
+  "allowed_ops": {
+    "stage_operators": [
+      "$match", "$group", "$sort", "$limit", "$project",
+      "$unwind", "$count", "$addFields", "$bucket"
+    ],
+    "expression_operators": [
+      "$sum", "$avg", "$min", "$max", "$first", "$last",
+      "$push", "$addToSet", "$size",
+      "$eq", "$ne", "$gt", "$gte", "$lt", "$lte",
+      "$in", "$nin", "$exists", "$regex",
+      "$and", "$or", "$not",
+      "$dateToString", "$year", "$month", "$dayOfMonth",
+      "$substr", "$toLower", "$toUpper",
+      "$cond", "$ifNull"
+    ]
+  },
+  "collection_keywords": {
+    "artifacts": [
+      "artifact", "container", "image", "wheel", "build", "sbom",
+      "disk", "iso", "qcow", "ami", "vhd", "base-image", "base image",
+      "accelerator", "cuda", "rocm", "cpu", "variant", "digest",
+      "instructlab", "model-car",
+      "production", "stage", "deployed", "environment"
+    ],
+    "drops": [
+      "drop", "release", "version", "announced", "published",
+      "series", "nightly", "rc", "freeze", "released"
+    ],
+    "products": [
+      "product", "supported", "namespace",
+      "konflux", "inference server"
+    ],
+    "git_repositories": [
+      "repo", "repository", "git", "branch", "tag", "gitlab",
+      "commit"
+    ]
+  },
+  "suggestions": [
+    "Show the latest rhel-ai containers",
+    "How many artifacts per product?",
+    "Count drops by product sorted by count",
+    "Find all base-images built for aarch64",
+    "Show rhaiis drops created after September 2025",
+    "What git repositories are there for artifacts?",
+    "Show artifacts deployed to production for rhel-ai",
+    "List all products",
+    "Show latest rhaiis artifact released into production"
+  ]
+}

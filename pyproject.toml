@@ -32,6 +32,11 @@ chat = [
     "requests>=2.31",
     "pymongo>=4.6",
 ]
+ui = [
+    "streamlit>=1.30",
+    "requests>=2.31",
+    "pymongo>=4.6",
+]
 
 [project.scripts]
 text-to-mongo-train = "text_to_mongo.training.cli:main"

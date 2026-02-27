@@ -1,4 +1,5 @@
-"""Tests for the interactive CLI chat tool (no external services required)."""
+"""Tests for the interactive query tools (no external services required)."""
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,40 +7,57 @@ from pathlib import Path
 import pytest
 from bson import ObjectId
 
-# Add tools/ to path so we can import chat
+# Add tools/ to path so we can import core
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from chat import (
-    SCHEMAS,
-    ALLOWED_OPS,
-    resolve_collection,
+from core import (
     _convert_extended_json,
     _json_serializer,
     execute_query,
+    load_config,
+    resolve_collection,
 )
 
+# ---------------------------------------------------------------------------
+# Dashboard config fixture
+# ---------------------------------------------------------------------------
 
-class TestSchemas:
-    def test_all_collections_present(self):
-        assert set(SCHEMAS.keys()) == {"products", "drops", "artifacts", "git_repositories"}
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "demos" / "dashboard" / "config.json"
 
-    def test_schemas_have_required_fields(self):
-        for name, schema in SCHEMAS.items():
+
+@pytest.fixture(scope="module")
+def dashboard_config():
+    return load_config(str(_CONFIG_PATH))
+
+
+# ---------------------------------------------------------------------------
+# Dashboard config tests
+# ---------------------------------------------------------------------------
+
+
+class TestDashboardConfig:
+    def test_all_collections_present(self, dashboard_config):
+        assert set(dashboard_config["schemas"].keys()) == {
+            "products", "drops", "artifacts", "git_repositories",
+        }
+
+    def test_schemas_have_required_fields(self, dashboard_config):
+        for name, schema in dashboard_config["schemas"].items():
             assert "collection" in schema, f"{name} missing 'collection'"
             assert "domain" in schema, f"{name} missing 'domain'"
             assert "fields" in schema, f"{name} missing 'fields'"
             assert len(schema["fields"]) > 0, f"{name} has no fields"
 
-    def test_field_structure(self):
-        for name, schema in SCHEMAS.items():
+    def test_field_structure(self, dashboard_config):
+        for name, schema in dashboard_config["schemas"].items():
             for field in schema["fields"]:
                 assert "name" in field, f"{name}: field missing 'name'"
                 assert "type" in field, f"{name}.{field.get('name')}: missing 'type'"
                 assert "role" in field, f"{name}.{field.get('name')}: missing 'role'"
 
-    def test_short_descriptions(self):
+    def test_short_descriptions(self, dashboard_config):
         """Descriptions must be 2-5 words or the LoRA model hallucinates."""
-        for name, schema in SCHEMAS.items():
+        for name, schema in dashboard_config["schemas"].items():
             for field in schema["fields"]:
                 desc = field.get("description", "")
                 if desc:
@@ -48,47 +66,66 @@ class TestSchemas:
                         f"{name}.{field['name']}: description '{desc}' has {word_count} words (max 5)"
                     )
 
-    def test_allowed_ops_not_empty(self):
-        assert len(ALLOWED_OPS["stage_operators"]) > 0
-        assert len(ALLOWED_OPS["expression_operators"]) > 0
+    def test_allowed_ops_not_empty(self, dashboard_config):
+        assert len(dashboard_config["allowed_ops"]["stage_operators"]) > 0
+        assert len(dashboard_config["allowed_ops"]["expression_operators"]) > 0
+
+    def test_keywords_cover_all_collections(self, dashboard_config):
+        assert set(dashboard_config["collection_keywords"].keys()) == set(dashboard_config["schemas"].keys())
+
+    def test_suggestions_not_empty(self, dashboard_config):
+        assert len(dashboard_config.get("suggestions", [])) > 0
+
+
+# ---------------------------------------------------------------------------
+# Collection resolver tests (using dashboard keywords)
+# ---------------------------------------------------------------------------
 
 
 class TestCollectionResolver:
+    @pytest.fixture(autouse=True)
+    def _load_keywords(self, dashboard_config):
+        self.keywords = dashboard_config["collection_keywords"]
+
     def test_artifacts_keywords(self):
-        assert resolve_collection("show latest containers") == "artifacts"
-        assert resolve_collection("find all disk-images") == "artifacts"
-        assert resolve_collection("how many artifacts?") == "artifacts"
-        assert resolve_collection("list all wheels") == "artifacts"
+        assert resolve_collection("show latest containers", self.keywords) == "artifacts"
+        assert resolve_collection("find all disk-images", self.keywords) == "artifacts"
+        assert resolve_collection("how many artifacts?", self.keywords) == "artifacts"
+        assert resolve_collection("list all wheels", self.keywords) == "artifacts"
 
     def test_drops_keywords(self):
-        assert resolve_collection("show all drops") == "drops"
-        assert resolve_collection("latest release") == "drops"
-        assert resolve_collection("when was it published?") == "drops"
+        assert resolve_collection("show all drops", self.keywords) == "drops"
+        assert resolve_collection("latest release", self.keywords) == "drops"
+        assert resolve_collection("when was it published?", self.keywords) == "drops"
 
     def test_products_keywords(self):
-        assert resolve_collection("list all products") == "products"
-        assert resolve_collection("show rhaiis info") == "products"
-        assert resolve_collection("what is rhel ai?") == "products"
+        assert resolve_collection("list all products", self.keywords) == "products"
+        assert resolve_collection("supported versions for this product", self.keywords) == "products"
+        assert resolve_collection("which konflux namespace?", self.keywords) == "products"
 
     def test_git_repositories_keywords(self):
-        assert resolve_collection("list all repositories") == "git_repositories"
-        assert resolve_collection("show git repos") == "git_repositories"
-        assert resolve_collection("find gitlab projects") == "git_repositories"
+        assert resolve_collection("list all repositories", self.keywords) == "git_repositories"
+        assert resolve_collection("show git repos", self.keywords) == "git_repositories"
+        assert resolve_collection("find gitlab projects", self.keywords) == "git_repositories"
 
     def test_no_match(self):
-        assert resolve_collection("hello world") is None
-        assert resolve_collection("what is the weather?") is None
+        assert resolve_collection("hello world", self.keywords) is None
+        assert resolve_collection("what is the weather?", self.keywords) is None
 
     def test_case_insensitive(self):
-        assert resolve_collection("Show Latest CONTAINERS") == "artifacts"
-        assert resolve_collection("LIST ALL DROPS") == "drops"
+        assert resolve_collection("Show Latest CONTAINERS", self.keywords) == "artifacts"
+        assert resolve_collection("LIST ALL DROPS", self.keywords) == "drops"
 
     def test_highest_score_wins(self):
-        # "container image build" has 3 artifact keywords
-        assert resolve_collection("container image build") == "artifacts"
+        assert resolve_collection("container image build", self.keywords) == "artifacts"
 
-    def test_product_key_resolves_to_products(self):
-        assert resolve_collection("show rhaiis product") == "products"
+    def test_artifact_in_production(self):
+        assert resolve_collection("show latest rhaiis artifact in production", self.keywords) == "artifacts"
+
+
+# ---------------------------------------------------------------------------
+# Generic function tests (no config dependency)
+# ---------------------------------------------------------------------------
 
 
 class TestConvertExtendedJson:

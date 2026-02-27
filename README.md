@@ -94,7 +94,12 @@ text-to-mongo-lora/
 │       ├── app.py             #   POST /predict endpoint
 │       └── models.py          #   Request/response models
 ├── tools/
-│   └── chat.py                # Interactive CLI chat against live MongoDB
+│   ├── core.py                # Generic query functions (inference, execution, config loader)
+│   ├── chat.py                # Interactive CLI chat (config-driven)
+│   └── app.py                 # Streamlit web UI (config-driven)
+├── demos/
+│   └── dashboard/
+│       └── config.json        # CI/CD dashboard schemas, keywords, suggestions
 ├── notebooks/
 │   └── text_to_mongo.ipynb    # Google Colab demo notebook
 ├── tests/                     # 89 pytest tests (no GPU required)
@@ -209,15 +214,19 @@ uvicorn text_to_mongo.serve.app:app --host 0.0.0.0 --port 8080
 {"status": "ok", "model": "qwen2.5-coder-7b", "adapter": "runs/qwen2.5-coder-7b_r8/adapter", "device": "cuda:0"}
 ```
 
-### Interactive Chat (requires running inference service + MongoDB)
+### Interactive Tools (requires running inference service + MongoDB)
 
 ```bash
+# CLI chat
 pip install -e ".[chat]"
+TOOL_CONFIG=demos/dashboard/config.json python tools/chat.py
 
-python tools/chat.py
+# Streamlit web UI
+pip install -e ".[ui]"
+TOOL_CONFIG=demos/dashboard/config.json streamlit run tools/app.py
 ```
 
-Connects to the LoRA inference service and a live MongoDB instance. Type natural language questions and get real query results. Configure via env vars: `LORA_URL`, `MONGO_URI`, `MONGO_DB`. See [`tools/README.md`](tools/README.md) for details.
+Both tools are generic and config-driven — provide a JSON file with your schemas, keywords, and allowed operators. The `demos/dashboard/` directory contains a ready-to-use config for the CI/CD dashboard. See [`tools/README.md`](tools/README.md) for the config format and details.
 
 ## Training Details
 

@@ -1,92 +1,90 @@
-# tools/ — Interactive CLI Chat
+# tools/ — Interactive Query Tools
 
-Test the LoRA model against a live MongoDB instance. Type a question, see the generated query, and get real results.
+Generic tools for querying MongoDB using the LoRA model. Configure for any database via a JSON config file.
+
+| Tool | File | Description |
+|---|---|---|
+| **CLI Chat** | `chat.py` | Terminal REPL — type questions, see queries and results |
+| **Streamlit UI** | `app.py` | Web UI with chat interface, schema browser, and connection status |
+| **Core** | `core.py` | Shared generic functions (inference client, query executor, etc.) |
 
 ## Prerequisites
 
 - LoRA inference service running on a GPU machine (see `src/text_to_mongo/serve/`)
-- MongoDB instance with the CI/CD dashboard data
+- MongoDB instance with your data
+- A config JSON file describing your schemas (see [Config Format](#config-format))
+
+## Install
 
 ```bash
+# CLI only
 pip install -e ".[chat]"
+
+# Streamlit UI
+pip install -e ".[ui]"
 ```
 
 ## Usage
 
+Both tools require a `TOOL_CONFIG` environment variable pointing to a config JSON file.
+
 ```bash
-python tools/chat.py
+# CLI chat
+TOOL_CONFIG=demos/dashboard/config.json python tools/chat.py
+
+# Or pass as CLI argument
+python tools/chat.py demos/dashboard/config.json
+
+# Streamlit web UI
+TOOL_CONFIG=demos/dashboard/config.json streamlit run tools/app.py
 ```
 
-### Environment Variables
+## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `LORA_URL` | `http://192.168.1.139:8080` | LoRA inference service URL |
+| `TOOL_CONFIG` | — | Path to config JSON (required) |
+| `LORA_URL` | `http://192.168.1.138:8080` | LoRA inference service URL |
 | `MONGO_URI` | `mongodb://mongoadmin:mongopassword@localhost:27017` | MongoDB connection string |
-| `MONGO_DB` | `cicd_dashboard` | Database name |
+| `MONGO_DB` | from config file | Database name (overrides config) |
 
-```bash
-LORA_URL=http://my-gpu:8080 \
-MONGO_URI=mongodb://user:pass@host:27017 \
-MONGO_DB=my_database \
-python tools/chat.py
+## Config Format
+
+```json
+{
+  "mongo_db": "my_database",
+  "schemas": {
+    "collection_name": {
+      "collection": "collection_name",
+      "domain": "my_domain",
+      "fields": [
+        {
+          "name": "field_name",
+          "type": "string",
+          "role": "identifier",
+          "description": "Short desc"
+        }
+      ]
+    }
+  },
+  "allowed_ops": {
+    "stage_operators": ["$match", "$group", "$sort"],
+    "expression_operators": ["$sum", "$avg", "$gt", "$lt"]
+  },
+  "collection_keywords": {
+    "collection_name": ["keyword1", "keyword2"]
+  },
+  "suggestions": [
+    "Example query for the UI"
+  ]
+}
 ```
 
-### Starting MongoDB (local)
+Field descriptions must be **2-5 words** — the LoRA model was trained on short descriptions and hallucinates with longer ones.
 
-```bash
-podman run -d --name mongodb -p 27017:27017 --rm \
-  -v $HOME/mongodb_data:/data/db:z \
-  -e MONGODB_INITDB_ROOT_USERNAME=mongoadmin \
-  -e MONGODB_INITDB_ROOT_PASSWORD=mongopassword \
-  quay.io/mongodb/mongodb-community-server:8.0-ubi9
-```
+See `demos/dashboard/config.json` for a complete example.
 
-## Example Session
-
-```
-Connected to MongoDB (cicd_dashboard) and LoRA service (http://192.168.1.139:8080)
-Collections: products, drops, artifacts, git_repositories
-Commands: collections, schema <name>, exit
-
-> show latest rhaiis containers
-  Collection: artifacts
-  Query: {"type": "find", "filter": {"product_key": "rhaiis", "type": "containers"}, "sort": {"created_at": -1}, "limit": 1}
-  Latency: 823ms
-  Results: 1 document(s)
-
-[
-  {
-    "key": "...",
-    "type": "containers",
-    "product_key": "rhaiis",
-    ...
-  }
-]
-
-> how many artifacts per product?
-  Collection: artifacts
-  Query: {"type": "aggregate", "pipeline": [{"$group": {"_id": "$product_key", "count": {"$sum": 1}}}]}
-  Latency: 956ms
-  Results: 4 document(s)
-
-[...]
-
-> schema drops
-  Collection: drops
-  Fields:
-    - key (string, identifier): Drop key
-    - name (string, text): Drop version name
-    - product_key (string, enum): Product key [rhel-ai, rhaiis, base-images, builder-images]
-    - product_version (string, text): Semantic version
-    - created_at (date, timestamp): Creation time
-    - announced_at (date, timestamp): Announcement time
-    - published_at (date, timestamp): Publication time
-
-> exit
-```
-
-## Commands
+## CLI Commands
 
 | Command | Description |
 |---|---|
@@ -95,4 +93,14 @@ Commands: collections, schema <name>, exit
 | `schema` | Show all schemas |
 | `exit` / `quit` / `q` | Exit the chat |
 
-Any other input is treated as a natural language question. The tool resolves the collection via keyword matching, sends the schema + question to the LoRA model, and executes the returned query against MongoDB.
+Any other input is treated as a natural language question.
+
+## Starting MongoDB (local)
+
+```bash
+podman run -d --name mongodb -p 27017:27017 --rm \
+  -v $HOME/mongodb_data:/data/db:z \
+  -e MONGODB_INITDB_ROOT_USERNAME=mongoadmin \
+  -e MONGODB_INITDB_ROOT_PASSWORD=mongopassword \
+  quay.io/mongodb/mongodb-community-server:8.0-ubi9
+```
