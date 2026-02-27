@@ -120,3 +120,37 @@ class TestEvalFields:
         result = eval_fields(query, schema)
         assert result.passed
         assert result.coverage == 0.0
+
+    def test_projection_fields_valid(self):
+        schema = _make_schema(["name", "status", "region"])
+        query = {
+            "type": "find",
+            "filter": {},
+            "projection": {"name": 1, "status": 1},
+        }
+        result = eval_fields(query, schema)
+        assert result.passed
+        assert "name" in result.referenced_fields
+        assert "status" in result.referenced_fields
+
+    def test_projection_hallucinated_field(self):
+        schema = _make_schema(["name", "status"])
+        query = {
+            "type": "find",
+            "filter": {},
+            "projection": {"name": 1, "fake_field": 1},
+        }
+        result = eval_fields(query, schema)
+        assert not result.passed
+        assert "fake_field" in result.hallucinated_fields
+
+    def test_projection_with_filter(self):
+        schema = _make_schema(["name", "status", "region"])
+        query = {
+            "type": "find",
+            "filter": {"status": "active"},
+            "projection": {"name": 1, "region": 1},
+        }
+        result = eval_fields(query, schema)
+        assert result.passed
+        assert {"name", "status", "region"} == result.referenced_fields

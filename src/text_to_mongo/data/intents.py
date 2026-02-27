@@ -161,6 +161,27 @@ def _build_enum_filter(
     }
 
 
+def _build_projection_only(
+    schema: SchemaDef, fields: list[FieldDef], **_: Any,
+) -> dict:
+    return {
+        "type": "find",
+        "filter": {},
+        "projection": {f.name: 1 for f in fields},
+    }
+
+
+def _build_filter_with_projection(
+    schema: SchemaDef, filter_field: FieldDef, filter_value: str,
+    proj_fields: list[FieldDef], **_: Any,
+) -> dict:
+    return {
+        "type": "find",
+        "filter": {filter_field.name: filter_value},
+        "projection": {f.name: 1 for f in proj_fields},
+    }
+
+
 def _build_date_bucket(
     schema: SchemaDef, measure: FieldDef, ts: FieldDef,
     agg_op: str, time_unit: str, **_: Any,
@@ -377,6 +398,61 @@ def generate_date_bucket(schema: SchemaDef, rng: random.Random) -> list[tuple[st
     return results
 
 
+def generate_projection_only(schema: SchemaDef, rng: random.Random) -> list[tuple[str, dict]]:
+    results = []
+    all_fields = schema.fields
+    if len(all_fields) < 2:
+        return results
+    n = rng.choice([2, 3]) if len(all_fields) >= 3 else 2
+    chosen = rng.sample(all_fields, n)
+    field_names = [f.name for f in chosen]
+    if len(field_names) == 2:
+        templates = [
+            f"Show {field_names[0]} and {field_names[1]} from {schema.collection}",
+            f"List the {field_names[0]} and {field_names[1]} for all {schema.collection}",
+            f"Get {field_names[0]} and {field_names[1]} of each {schema.collection}",
+        ]
+    else:
+        joined = ", ".join(field_names[:-1]) + f" and {field_names[-1]}"
+        templates = [
+            f"Show {joined} from {schema.collection}",
+            f"List the {joined} for all {schema.collection}",
+            f"Get just {joined} from {schema.collection}",
+        ]
+    intent = rng.choice(templates)
+    query = _build_projection_only(schema, chosen)
+    results.append((intent, query))
+    return results
+
+
+def generate_filter_with_projection(schema: SchemaDef, rng: random.Random) -> list[tuple[str, dict]]:
+    results = []
+    filter_candidates = schema.fields_by_role(FieldRole.enum) + schema.fields_by_role(FieldRole.category)
+    other_fields = [f for f in schema.fields if f not in filter_candidates]
+    if not filter_candidates or not other_fields:
+        return results
+    ff = rng.choice(filter_candidates)
+    fv = _sample_enum_value(ff, rng)
+    n = min(rng.choice([1, 2]), len(other_fields))
+    proj = rng.sample(other_fields, n)
+    proj_names = [f.name for f in proj]
+    if len(proj_names) == 1:
+        templates = [
+            f"Show {proj_names[0]} for {schema.collection} where {ff.name} is {fv}",
+            f"Get {proj_names[0]} from {schema.collection} with {ff.name} = {fv}",
+        ]
+    else:
+        joined = f"{proj_names[0]} and {proj_names[1]}"
+        templates = [
+            f"Show {joined} for {schema.collection} where {ff.name} is {fv}",
+            f"Find {joined} in {schema.collection} with {ff.name} = {fv}",
+        ]
+    intent = rng.choice(templates)
+    query = _build_filter_with_projection(schema, ff, fv, proj)
+    results.append((intent, query))
+    return results
+
+
 # ---------------------------------------------------------------------------
 # All generators in order
 # ---------------------------------------------------------------------------
@@ -391,4 +467,6 @@ ALL_GENERATORS = [
     generate_exists_check,
     generate_enum_filter,
     generate_date_bucket,
+    generate_projection_only,
+    generate_filter_with_projection,
 ]

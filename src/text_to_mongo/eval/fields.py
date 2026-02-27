@@ -57,6 +57,10 @@ def eval_fields(query: dict[str, Any], schema: SchemaDef) -> FieldResult:
         body = query
     refs = extract_field_refs(body)
 
+    # Also extract from projection if present
+    if "projection" in query:
+        refs.update(extract_field_refs(query["projection"]))
+
     # Remove implicit fields and the "type" key (not a real field ref)
     refs -= IMPLICIT_FIELDS
     refs.discard("type")

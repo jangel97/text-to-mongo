@@ -6,6 +6,8 @@ Given a collection schema, allowed operators, and a plain-English intent, the mo
 
 **[See the model in action on Google Colab](https://colab.research.google.com/drive/1jb22dXx0k-5aiZq0O9gGS7emnvRdlhHb)** | **[Model](https://huggingface.co/jmorenas/text-to-mongo-qlora)** | **[Dataset](https://huggingface.co/datasets/jmorenas/text-to-mongo-dataset-qlora)**
 
+This is my weekend project. 
+
 ## Results
 
 **Base model**: Qwen2.5-Coder-7B-Instruct (4-bit QLoRA)

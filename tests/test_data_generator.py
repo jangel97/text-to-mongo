@@ -15,6 +15,7 @@ from text_to_mongo.data.schemas import (
     HELD_OUT_SCHEMAS,
     TRAIN_SCHEMAS,
 )
+from text_to_mongo.data.intents import generate_projection_only, generate_filter_with_projection
 from text_to_mongo.schema import AllowedOps, FieldDef, FieldRole, SchemaDef, TrainingExample
 
 
@@ -74,6 +75,77 @@ class TestAugmentation:
         examples = generate_base_examples(seed=42)
         augmented = run_all_augmentations(examples, seed=42)
         assert len(augmented) > 0, "Augmentation produced no additional examples"
+
+
+class TestProjectionGenerators:
+    @pytest.fixture()
+    def schema(self):
+        return SchemaDef(
+            collection="orders",
+            domain="ecommerce",
+            fields=[
+                FieldDef(name="order_id", type="string", role=FieldRole.identifier, description="Order ID"),
+                FieldDef(name="status", type="string", role=FieldRole.enum, description="Order status",
+                         enum_values=["pending", "shipped", "delivered"]),
+                FieldDef(name="total", type="double", role=FieldRole.measure, description="Order total"),
+                FieldDef(name="region", type="string", role=FieldRole.category, description="Region"),
+                FieldDef(name="customer_name", type="string", role=FieldRole.text, description="Customer name"),
+            ],
+        )
+
+    def test_projection_only_generates_examples(self, schema):
+        rng = random.Random(42)
+        results = generate_projection_only(schema, rng)
+        assert len(results) >= 1
+
+    def test_projection_only_structure(self, schema):
+        rng = random.Random(42)
+        results = generate_projection_only(schema, rng)
+        for intent, query in results:
+            assert query["type"] == "find"
+            assert query["filter"] == {}
+            assert "projection" in query
+            assert len(query["projection"]) >= 2
+
+    def test_projection_only_no_exclusion(self, schema):
+        rng = random.Random(42)
+        results = generate_projection_only(schema, rng)
+        for _, query in results:
+            for field_name, value in query["projection"].items():
+                assert value == 1, f"Projection for {field_name} should be 1, got {value}"
+
+    def test_projection_fields_in_schema(self, schema):
+        rng = random.Random(42)
+        results = generate_projection_only(schema, rng)
+        schema_field_names = {f.name for f in schema.fields}
+        for _, query in results:
+            for field_name in query["projection"]:
+                assert field_name in schema_field_names, f"{field_name} not in schema"
+
+    def test_filter_with_projection_generates_examples(self, schema):
+        rng = random.Random(42)
+        results = generate_filter_with_projection(schema, rng)
+        assert len(results) >= 1
+
+    def test_filter_with_projection_structure(self, schema):
+        rng = random.Random(42)
+        results = generate_filter_with_projection(schema, rng)
+        for intent, query in results:
+            assert query["type"] == "find"
+            assert len(query["filter"]) > 0
+            assert "projection" in query
+            for value in query["projection"].values():
+                assert value == 1
+
+    def test_filter_with_projection_fields_in_schema(self, schema):
+        rng = random.Random(42)
+        results = generate_filter_with_projection(schema, rng)
+        schema_field_names = {f.name for f in schema.fields}
+        for _, query in results:
+            for field_name in query["filter"]:
+                assert field_name in schema_field_names
+            for field_name in query["projection"]:
+                assert field_name in schema_field_names
 
 
 class TestDatasetExport:

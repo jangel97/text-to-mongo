@@ -114,7 +114,6 @@
     "Count drops by product sorted by count",
     "Find all base-images built for aarch64",
     "Show rhaiis drops created after September 2025",
-    "What git repositories are there for artifacts?",
     "Show artifacts deployed to production for rhel-ai",
     "List all products",
     "Show latest rhaiis artifact released into production"
