@@ -118,7 +118,19 @@ pytest
 python -m text_to_mongo.data
 ```
 
-Produces `data/train.jsonl`, `data/eval.jsonl`, and `data/held_out.jsonl` from 16 synthetic collection schemas with augmentation (field shuffling, date variations, operator subsets, 15% negative examples).
+Produces `data/train.jsonl`, `data/eval.jsonl`, and `data/held_out.jsonl`. The entire dataset is synthetic — no human labeling required. Generation is deterministic (seed 42) and runs in under a second.
+
+**Schemas**: 19 hand-crafted MongoDB collection schemas across 8 domains (e-commerce, healthcare, IoT, HR, finance, logistics, social, education). Each schema defines 5-7 fields with typed semantic roles (`identifier`, `measure`, `timestamp`, `category`, `enum`, `boolean`, `text`). 16 schemas are used for training, 3 are held out for generalization testing.
+
+**Intent generation**: 10 generator functions produce (natural language, MongoDB query) pairs for each schema: simple filters, single/filtered/multi-group aggregations, time range queries, top-N, counts, exists checks, enum `$in` filters, and date bucketing. Each generator reads the schema fields, picks fields that match the required roles (e.g. aggregation needs a `measure` and a `category`), generates a randomized natural language intent, and builds the corresponding ground-truth query. This produces ~235 base examples.
+
+**Augmentation**: Four strategies multiply the base examples to ~1,800 total:
+- **Field name shuffling** (6 passes) — renames fields to synonyms (`salary` → `compensation`, `likes` → `upvotes`) in both the schema and query, preventing the model from memorizing field names
+- **Negatives** (15%) — replaces the intent with a hallucinated field name and the output with `{"error": "..."}`, teaching the model to reject invalid queries
+- **Date variation** (4 passes) — swaps hardcoded dates with random concrete dates, so the model doesn't memorize specific date strings
+- **Operator subset** (4 passes) — randomly removes unused operators from the allowed list, teaching the model to read the operator constraints rather than assume a fixed set
+
+**Splits**: Examples from held-out schemas go entirely into `held_out.jsonl`. The rest are shuffled and split 90/10 into `train.jsonl` / `eval.jsonl`.
 
 ### Train (requires GPU)
 
