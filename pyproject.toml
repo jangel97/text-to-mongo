@@ -28,6 +28,10 @@ train = [
 serve = [
     "fastapi[standard]>=0.100",
 ]
+chat = [
+    "requests>=2.31",
+    "pymongo>=4.6",
+]
 
 [project.scripts]
 text-to-mongo-train = "text_to_mongo.training.cli:main"

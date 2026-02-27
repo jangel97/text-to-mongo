@@ -4,6 +4,8 @@ Fine-tuned language model that translates natural language questions into MongoD
 
 Given a collection schema, allowed operators, and a plain-English intent, the model produces a valid `find` or `aggregate` query as JSON — running locally on a single GPU with ~1 second inference latency.
 
+**[See the model in action on Google Colab](https://colab.research.google.com/drive/1jb22dXx0k-5aiZq0O9gGS7emnvRdlhHb)** | **[Model](https://huggingface.co/jmorenas/text-to-mongo-qlora)** | **[Dataset](https://huggingface.co/datasets/jmorenas/text-to-mongo-dataset-qlora)**
+
 ## Results
 
 **Base model**: Qwen2.5-Coder-7B-Instruct (4-bit QLoRA)
@@ -91,9 +93,13 @@ text-to-mongo-lora/
 │   └── serve/                 # FastAPI inference microservice
 │       ├── app.py             #   POST /predict endpoint
 │       └── models.py          #   Request/response models
+├── tools/
+│   └── chat.py                # Interactive CLI chat against live MongoDB
+├── notebooks/
+│   └── text_to_mongo.ipynb    # Google Colab demo notebook
 ├── tests/                     # 89 pytest tests (no GPU required)
-├── pyproject.toml             # Package config with [train] and [serve] optional deps
-└── data/                      # Generated JSONL (not committed, reproducible)
+├── pyproject.toml             # Package config with [train], [serve], [chat] optional deps
+└── data/                      # Generated JSONL
     ├── train.jsonl            #   ~1,312 examples
     ├── eval.jsonl             #   ~145 examples
     └── held_out.jsonl         #   ~368 examples (unseen schemas)
@@ -202,6 +208,16 @@ uvicorn text_to_mongo.serve.app:app --host 0.0.0.0 --port 8080
 ```json
 {"status": "ok", "model": "qwen2.5-coder-7b", "adapter": "runs/qwen2.5-coder-7b_r8/adapter", "device": "cuda:0"}
 ```
+
+### Interactive Chat (requires running inference service + MongoDB)
+
+```bash
+pip install -e ".[chat]"
+
+python tools/chat.py
+```
+
+Connects to the LoRA inference service and a live MongoDB instance. Type natural language questions and get real query results. Configure via env vars: `LORA_URL`, `MONGO_URI`, `MONGO_DB`. See [`tools/README.md`](tools/README.md) for details.
 
 ## Training Details
 
