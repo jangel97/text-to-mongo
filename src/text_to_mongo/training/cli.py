@@ -45,6 +45,7 @@ def cmd_baseline(args: argparse.Namespace) -> None:
         data_dir=args.data_dir,
         output_dir=args.output_dir,
         batch_size=args.batch_size,
+        device=args.device,
     )
 
     for split, report in reports.items():
@@ -89,6 +90,7 @@ def cmd_eval(args: argparse.Namespace) -> None:
         data_dir=args.data_dir,
         output_dir=args.output_dir,
         batch_size=args.batch_size,
+        device=args.device,
     )
 
     for split, report in reports.items():
@@ -123,6 +125,10 @@ def main(argv: list[str] | None = None) -> None:
     # baseline
     p_baseline = subparsers.add_parser("baseline", help="Run zero-shot baseline evaluation")
     _add_common_args(p_baseline)
+    p_baseline.add_argument(
+        "--device", choices=["auto", "cpu", "cuda"], default="auto",
+        help="Device for inference: auto (default), cpu, or cuda",
+    )
     p_baseline.set_defaults(func=cmd_baseline)
 
     # train
@@ -141,6 +147,10 @@ def main(argv: list[str] | None = None) -> None:
     _add_common_args(p_eval)
     p_eval.add_argument("--adapter", type=str, required=True, help="Path to saved adapter directory")
     p_eval.add_argument("--run-name", type=str, required=True, help="Name for this eval run")
+    p_eval.add_argument(
+        "--device", choices=["auto", "cpu", "cuda"], default="auto",
+        help="Device for inference: auto (default), cpu, or cuda",
+    )
     p_eval.set_defaults(func=cmd_eval)
 
     # compare

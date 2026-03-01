@@ -165,15 +165,59 @@ python -m text_to_mongo.training compare
 
 Training takes ~20 minutes on an RTX 5090 (3 epochs, batch size 4, gradient accumulation 4).
 
-### Serve (requires GPU)
+### Serve (GPU)
+
+Requires a CUDA GPU with ~5GB VRAM.
+
+**1. Install**
 
 ```bash
 pip install -e ".[serve]"
-
-# Start inference service
-ADAPTER_PATH=runs/qwen2.5-coder-7b_r8/adapter \
-uvicorn text_to_mongo.serve.app:app --host 0.0.0.0 --port 8080
 ```
+
+**2. Download the adapter** (skip if you trained locally)
+
+```bash
+pip install huggingface_hub
+mkdir -p runs/qwen2.5-coder-7b_r8
+huggingface-cli download jmorenas/text-to-mongo-qlora --local-dir runs/qwen2.5-coder-7b_r8/adapter
+```
+
+**3. Start the server**
+
+```bash
+ADAPTER_PATH=runs/qwen2.5-coder-7b_r8/adapter \
+  uvicorn text_to_mongo.serve.app:app --host 0.0.0.0 --port 8080
+```
+
+**4. Test it**
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Generate a query
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema": {
+      "collection": "orders",
+      "domain": "ecommerce",
+      "fields": [
+        {"name": "total", "type": "double", "role": "measure", "description": "Order total"},
+        {"name": "status", "type": "string", "role": "enum", "description": "Order status",
+         "enum_values": ["pending", "shipped", "delivered"]}
+      ]
+    },
+    "allowed_ops": {
+      "stage_operators": ["$match", "$group", "$sort"],
+      "expression_operators": ["$sum", "$avg", "$gt", "$gte"]
+    },
+    "intent": "Find all pending orders"
+  }'
+```
+
+Expect ~1 second per query on GPU.
 
 #### API
 
@@ -215,6 +259,87 @@ uvicorn text_to_mongo.serve.app:app --host 0.0.0.0 --port 8080
 ```json
 {"status": "ok", "model": "qwen2.5-coder-7b", "adapter": "runs/qwen2.5-coder-7b_r8/adapter", "device": "cuda:0"}
 ```
+
+### CPU Inference (no GPU required)
+
+You can run inference on CPU with ~14GB RAM. The first run downloads the base model (~14GB), subsequent runs use the cache.
+
+**1. Install**
+
+```bash
+git clone <repo-url>
+cd text-to-mongo-lora
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[inference]"
+```
+
+**2. Download the adapter**
+
+```bash
+# Install huggingface_hub CLI if needed
+pip install huggingface_hub
+
+# Download adapter weights into the expected directory
+mkdir -p runs/qwen2.5-coder-7b_r8
+huggingface-cli download jmorenas/text-to-mongo-qlora --local-dir runs/qwen2.5-coder-7b_r8/adapter
+```
+
+**3. Start the server**
+
+```bash
+DEVICE=cpu ADAPTER_PATH=runs/qwen2.5-coder-7b_r8/adapter \
+  uvicorn text_to_mongo.serve.app:app --port 8080
+```
+
+First startup takes a few minutes (loading + merging the 7B model). Once you see `Uvicorn running on http://0.0.0.0:8080`, the server is ready.
+
+**4. Test it**
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Generate a query
+curl -X POST http://localhost:8080/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema": {
+      "collection": "orders",
+      "domain": "ecommerce",
+      "fields": [
+        {"name": "total", "type": "double", "role": "measure", "description": "Order total"},
+        {"name": "status", "type": "string", "role": "enum", "description": "Order status",
+         "enum_values": ["pending", "shipped", "delivered"]}
+      ]
+    },
+    "allowed_ops": {
+      "stage_operators": ["$match", "$group", "$sort"],
+      "expression_operators": ["$sum", "$avg", "$gt", "$gte"]
+    },
+    "intent": "Find all pending orders"
+  }'
+```
+
+Expect ~30-60 seconds per query on CPU.
+
+**GPU vs CPU comparison:**
+
+| | GPU (default) | CPU |
+|---|---|---|
+| Precision | 4-bit NF4 (bitsandbytes) | float16 |
+| RAM/VRAM | ~5 GB VRAM | ~14 GB RAM |
+| Latency | ~1 sec/query | ~30-60 sec/query |
+| Adapter | PeftModel wrapper (no merge) | Merged into base weights |
+
+The `--device auto` default detects CUDA availability and picks accordingly. You can also use `--device cpu` with the CLI commands:
+
+```bash
+python -m text_to_mongo.training baseline --model qwen2.5-coder-7b --device cpu --batch-size 1
+python -m text_to_mongo.training eval --model qwen2.5-coder-7b \
+  --adapter runs/qwen2.5-coder-7b_r8/adapter --run-name cpu_eval --device cpu --batch-size 1
+```
+
+Training still requires a GPU.
 
 ### Interactive Tools (requires running inference service + MongoDB)
 

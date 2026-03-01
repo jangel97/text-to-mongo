@@ -15,17 +15,21 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
-train = [
+inference = [
     "torch>=2.2.0",
-    "transformers>=4.40.0",
+    "transformers>=4.40.0,<4.46.0",
     "peft>=0.10.0",
+    "accelerate>=0.28.0",
+]
+train = [
+    "text-to-mongo[inference]",
     "trl>=0.8.0",
     "bitsandbytes>=0.43.0",
     "datasets>=2.18.0",
-    "accelerate>=0.28.0",
     "scipy",
 ]
 serve = [
+    "text-to-mongo[inference]",
     "fastapi[standard]>=0.100",
 ]
 chat = [

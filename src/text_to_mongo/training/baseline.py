@@ -86,6 +86,7 @@ def run_baseline(
     data_dir: Path = Path("data"),
     output_dir: Path = Path("runs"),
     batch_size: int = 8,
+    device: str | None = None,
 ) -> dict[str, EvalReport]:
     """Run zero-shot baseline evaluation for a model.
 
@@ -94,6 +95,7 @@ def run_baseline(
         data_dir: Directory containing eval.jsonl and held_out.jsonl.
         output_dir: Parent directory for run output.
         batch_size: Generation batch size.
+        device: 'cuda', 'cpu', or 'auto'. Default auto-detects.
 
     Returns:
         Dict mapping split name to EvalReport.
@@ -106,7 +108,7 @@ def run_baseline(
     logger.info("Output: %s", run_dir)
 
     # Load model (no adapter)
-    model, tokenizer = load_model_for_inference(model_config, adapter_path=None)
+    model, tokenizer = load_model_for_inference(model_config, adapter_path=None, device=device)
 
     # Load eval splits
     eval_examples = load_examples(data_dir / "eval.jsonl")

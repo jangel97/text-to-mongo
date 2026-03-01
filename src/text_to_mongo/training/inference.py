@@ -11,45 +11,81 @@ from text_to_mongo.training.config import ModelConfig
 logger = logging.getLogger(__name__)
 
 
-def load_model_for_inference(model_config: ModelConfig, adapter_path: str | None = None):
-    """Load a 4-bit base model with optional LoRA adapter merged.
+def _resolve_device(device: str | None) -> str:
+    """Resolve device string: 'auto' detects CUDA, None defaults to 'auto'."""
+    if device is None or device == "auto":
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return device
+
+
+def load_model_for_inference(
+    model_config: ModelConfig,
+    adapter_path: str | None = None,
+    device: str | None = None,
+):
+    """Load a base model with optional LoRA adapter for inference.
+
+    On CUDA: loads 4-bit quantized model via bitsandbytes. Adapter is kept
+    as a PeftModel wrapper (merge_and_unload fails on quantized weights).
+
+    On CPU: loads in float16 without quantization. Adapter is merged into
+    the base weights via merge_and_unload (works on full-precision weights).
 
     Args:
         model_config: Model configuration.
         adapter_path: Path to a saved LoRA adapter directory. If None, loads base model only.
+        device: 'cuda', 'cpu', or 'auto' (default). Auto-detects CUDA availability.
 
     Returns:
         (model, tokenizer) tuple ready for generation.
     """
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-    )
+    resolved = _resolve_device(device)
+    use_cuda = resolved == "cuda"
+    logger.info("Loading model on device: %s", resolved)
+
+    if use_cuda:
+        from transformers import BitsAndBytesConfig
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
+        load_kwargs = dict(
+            quantization_config=bnb_config,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+    else:
+        load_kwargs = dict(
+            torch_dtype=torch.float16,
+            device_map=None,
+            trust_remote_code=True,
+        )
 
     if adapter_path:
         from peft import PeftModel
 
         base_model = AutoModelForCausalLM.from_pretrained(
-            model_config.hf_id,
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
+            model_config.hf_id, **load_kwargs,
         )
         model = PeftModel.from_pretrained(base_model, adapter_path)
-        # Do NOT merge_and_unload — merging into 4-bit quantized weights
-        # silently fails. Keep PeftModel for inference instead.
-        logger.info("Loaded adapter from %s (PeftModel, not merged)", adapter_path)
+        if use_cuda:
+            # Do NOT merge_and_unload — merging into 4-bit quantized weights
+            # silently fails. Keep PeftModel for inference instead.
+            logger.info("Loaded adapter from %s (PeftModel, not merged)", adapter_path)
+        else:
+            # On CPU, weights are full-precision so merge works correctly.
+            model = model.merge_and_unload()
+            logger.info("Loaded and merged adapter from %s", adapter_path)
     else:
         model = AutoModelForCausalLM.from_pretrained(
-            model_config.hf_id,
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
+            model_config.hf_id, **load_kwargs,
         )
         logger.info("Loaded base model (no adapter): %s", model_config.hf_id)
 

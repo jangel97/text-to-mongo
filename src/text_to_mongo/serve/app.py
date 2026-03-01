@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5-coder-7b")
 ADAPTER_PATH = os.getenv("ADAPTER_PATH", "runs/qwen2.5-coder-7b_r8/adapter")
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "256"))
+DEVICE = os.getenv("DEVICE", "auto")
 
 _model = None
 _tokenizer = None
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI):
     logger.info("Loading model %s with adapter %s ...", MODEL_NAME, ADAPTER_PATH)
 
     start = time.time()
-    _model, _tokenizer = load_model_for_inference(_model_config, adapter_path=ADAPTER_PATH)
+    _model, _tokenizer = load_model_for_inference(_model_config, adapter_path=ADAPTER_PATH, device=DEVICE)
     elapsed = time.time() - start
     logger.info("Model loaded in %.1fs", elapsed)
 

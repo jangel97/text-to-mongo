@@ -27,6 +27,7 @@ def run_post_training_eval(
     data_dir: Path = Path("data"),
     output_dir: Path = Path("runs"),
     batch_size: int = 8,
+    device: str | None = None,
 ) -> dict[str, EvalReport]:
     """Evaluate a fine-tuned adapter on eval and held-out splits.
 
@@ -37,6 +38,7 @@ def run_post_training_eval(
         data_dir: Directory containing eval.jsonl and held_out.jsonl.
         output_dir: Parent directory for run output.
         batch_size: Generation batch size.
+        device: 'cuda', 'cpu', or 'auto'. Default auto-detects.
 
     Returns:
         Dict mapping split name to EvalReport.
@@ -48,7 +50,7 @@ def run_post_training_eval(
     logger.info("Running post-training eval: %s (adapter: %s)", run_name, adapter_path)
 
     # Load model with adapter
-    model, tokenizer = load_model_for_inference(model_config, adapter_path=adapter_path)
+    model, tokenizer = load_model_for_inference(model_config, adapter_path=adapter_path, device=device)
 
     # Load eval splits
     eval_examples = load_examples(data_dir / "eval.jsonl")
